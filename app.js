@@ -12,8 +12,8 @@ var fs = require('fs');
 setInterval(function () {
 
     var sound = getSoundSample();   
-    var reqString = "camdeardorff.com/PHP/Forwarder.php?decibels="+ 
-sound +"&atTime="+ new Date();
+    var reqString = "http://cafbees.herokuapp.com/soundReport/new?decibels="+ 
+sound +"&atTime="+ new Date().valueOf();
     console.log("sending request: ", reqString);
 
     http.post(reqString, function (err, res) {
