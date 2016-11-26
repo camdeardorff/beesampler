@@ -1,13 +1,24 @@
 console.log("Running...");
 
+// module libraries
 var groveSensor = require('jsupm_loudness');
 var groveDisplay = require('jsupm_i2clcd');
+// modules
 var sensor = new groveSensor.Loudness(0, 5.0);
 var display = new groveDisplay.Jhd1313m1(0);
+// libraries
 var request = require('request');
 var jsonfile = require('jsonfile');
+var os = require('os');
+// state variables
 var loundnessIntervalTotal = 0;
 var failedReports = 0;
+var displayState = 0;
+
+const DISPLAY_STATES = {
+	CONNECTION: 0,
+	LOUDNESS: 1
+}
 
 const HOLD_FILE = '/home/root/CafSense/savedSamples.json'
 const SERVER_LOCATION = "http://cafbees.herokuapp.com/soundReport/new";
@@ -22,6 +33,29 @@ function displayLoudness(loudness) {
 	display.write(loudness.toString());
 }
 
+function displayConnectivityState() {
+	var ni = os.networkInterfaces();
+	var ipAddr = null;
+	// has wireless connection
+	if (ni.wlp1s0) {
+		// need the first one
+		if (ni.wlp1s0.length > 0) {
+			var wireless = ni.wlp1s0[0];
+			ipAddr = wireless.address;
+		}
+	}
+	display.clear();
+	display.setColor(60, 60, 60);
+	display.setCursor(0, 0);
+	if (ipAddr) {
+		display.write("Connected: true");
+		display.setCursor(1, 0);
+		display.write("@ " + ipAddr);
+	} else {
+		display.write("Connected: false");
+	}
+}
+
 
 /*
 Function: Check Loudness
@@ -31,7 +65,11 @@ Purpose: gets the loudness of the envirnment and adds that to the
 var checkLoundess = function () {
 	var loudness = sensor.loudness();
 	loundnessIntervalTotal += loudness;
-	displayLoudness(loudness);
+	if (displayState === DISPLAY_STATES.LOUDNESS) {
+		displayLoudness(loudness);
+	} else {
+		displayConnectivityState();
+	}
 }
 
 
@@ -41,6 +79,11 @@ Purpose: gets the total loudness and resets for the next interval
 Returns: number
 */
 function getTotalLoudness() {
+	if (displayState === DISPLAY_STATES.CONNECTION) {
+		displayState = DISPLAY_STATES.LOUDNESS;
+	} else {
+		displayState = DISPLAY_STATES.CONNECTION;
+	}
 	var total = loundnessIntervalTotal;
 	loundnessIntervalTotal = 0;
 	return total;
@@ -75,7 +118,6 @@ Params: sample: {obj}
 function saveFailedSample(sample) {
 
 	jsonfile.readFile(HOLD_FILE, function (err, savedData) {
-		console.dir(savedData);
 		if (!savedData) {
 			savedData = {
 				samples: []
