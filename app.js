@@ -24,15 +24,26 @@ const HOLD_FILE = '/home/root/CafSense/savedSamples.json'
 const SERVER_LOCATION = "http://cafbees.herokuapp.com/soundReport/new";
 
 
+/*
+Function: Display Loudness
+Purpose: shows the loudness value provide, formatted on the display.
+Params: loudness: number
+*/
 function displayLoudness(loudness) {
 	display.clear();
-	display.setColor(50, 50, 50);
+	display.setColor(20, 20, 50);
 	display.setCursor(0, 0);
-	display.write("loudness: ");
+	display.write("Total Loudness: ");
 	display.setCursor(1, 0);
 	display.write(loudness.toString());
 }
 
+
+/*
+Function: Display Connectiviy State
+Purpose: shows the current state of wireless connectivity. Reads the data internally
+	and displays it properly.
+*/
 function displayConnectivityState() {
 	var ni = os.networkInterfaces();
 	var ipAddr = null;
@@ -45,7 +56,7 @@ function displayConnectivityState() {
 		}
 	}
 	display.clear();
-	display.setColor(60, 60, 60);
+	display.setColor(20, 50, 20);
 	display.setCursor(0, 0);
 	if (ipAddr) {
 		display.write("Connected: true");
@@ -63,13 +74,8 @@ Purpose: gets the loudness of the envirnment and adds that to the
 	loudness interval total.
 */
 var checkLoundess = function () {
-	var loudness = sensor.loudness();
+	var loudness = sensor.loudness() * 100;
 	loundnessIntervalTotal += loudness;
-	if (displayState === DISPLAY_STATES.LOUDNESS) {
-		displayLoudness(loudness);
-	} else {
-		displayConnectivityState();
-	}
 }
 
 
@@ -79,11 +85,6 @@ Purpose: gets the total loudness and resets for the next interval
 Returns: number
 */
 function getTotalLoudness() {
-	if (displayState === DISPLAY_STATES.CONNECTION) {
-		displayState = DISPLAY_STATES.LOUDNESS;
-	} else {
-		displayState = DISPLAY_STATES.CONNECTION;
-	}
 	var total = loundnessIntervalTotal;
 	loundnessIntervalTotal = 0;
 	return total;
@@ -139,7 +140,16 @@ Purpose: sends a sample to the server
 */
 var report = function () {
 	// create the post data with the current sound sample
-	var data = createPostData(getTotalLoudness());
+	var loudnessValue = getTotalLoudness();
+	var data = createPostData(loudnessValue);
+
+	if (displayState === DISPLAY_STATES.LOUDNESS) {
+		displayLoudness(loudnessValue);
+		displayState = DISPLAY_STATES.CONNECTION
+	} else {
+		displayConnectivityState();
+		displayState = DISPLAY_STATES.LOUDNESS
+	}
 
 	//post the data and handle the aftermath
 	request.post(data, function (err, httpResponse, body) {
