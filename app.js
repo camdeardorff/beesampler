@@ -1,17 +1,25 @@
 console.log("Running...");
 
+const WIFI_SSID = "MVNU-student";
+const HOLD_FILE = '/home/root/CafSense/savedSamples.json'
+const SERVER_LOCATION = "http://cafbees.herokuapp.com/soundReport/new";
+
+
 // module libraries
+var WifiControl = require('./wifi-control');
+var wifi = new WifiControl(WIFI_SSID);
+console.log(wifi);
+var lcdDisplay = require('./display');
+var display = new lcdDisplay(0);
+
 var groveSensor = require('jsupm_loudness');
-var groveDisplay = require('jsupm_i2clcd');
-// modules
 var sensor = new groveSensor.Loudness(0, 5.0);
-var display = new groveDisplay.Jhd1313m1(0);
+
 // libraries
 var request = require('request');
 var jsonfile = require('jsonfile');
-var os = require('os');
 // state variables
-var loundnessIntervalTotal = 0;
+var compoundLoudness = 0;
 var failedReports = 0;
 var displayState = 0;
 
@@ -20,93 +28,15 @@ const DISPLAY_STATES = {
 	LOUDNESS: 1
 }
 
-const HOLD_FILE = '/home/root/CafSense/savedSamples.json'
-const SERVER_LOCATION = "http://cafbees.herokuapp.com/soundReport/new";
-
 
 /*
-Function: Display Loudness
-Purpose: shows the loudness value provide, formatted on the display.
-Params: loudness: number
-*/
-function displayLoudness(loudness) {
-	display.clear();
-	display.setColor(20, 20, 50);
-	display.setCursor(0, 0);
-	display.write("Total Loudness: ");
-	display.setCursor(1, 0);
-	display.write(loudness.toString());
-}
-
-
-/*
-Function: Display Connectiviy State
-Purpose: shows the current state of wireless connectivity. Reads the data internally
-	and displays it properly.
-*/
-function displayConnectivityState() {
-	var ni = os.networkInterfaces();
-	var ipAddr = null;
-	// has wireless connection
-	if (ni.wlp1s0) {
-		// need the first one
-		if (ni.wlp1s0.length > 0) {
-			var wireless = ni.wlp1s0[0];
-			ipAddr = wireless.address;
-		}
-	}
-	display.clear();
-	display.setColor(20, 50, 20);
-	display.setCursor(0, 0);
-	if (ipAddr) {
-		display.write("Connected: true");
-		display.setCursor(1, 0);
-		display.write("@ " + ipAddr);
-	} else {
-		display.write("Connected: false");
-	}
-}
-
-
-/*
-Function: Check Loudness
+Function: Get Loudness
 Purpose: gets the loudness of the envirnment and adds that to the 
 	loudness interval total.
-*/
-var checkLoundess = function () {
-	var loudness = sensor.loudness() * 100;
-	loundnessIntervalTotal += loudness;
-}
-
-
-/* 
-Function: Get Total Loudness
-Purpose: gets the total loudness and resets for the next interval
 Returns: number
 */
-function getTotalLoudness() {
-	var total = loundnessIntervalTotal;
-	loundnessIntervalTotal = 0;
-	return total;
-}
-
-
-/*
-Function: Create Post Data
-Purpose: creates and fills the structure of post requests in accordance
-	with the request module.
-Params: sound: number
-Returns: {obj} 
-*/
-function createPostData(sound) {
-	return {
-		url: SERVER_LOCATION,
-		form: {
-			loudness: sound,
-			decibels: sound,
-			atTime: new Date().valueOf()
-		}
-	};
+function getLoudness() {
+	return sensor.loudness() * 100;
 }
 
 
@@ -117,6 +47,15 @@ Purpose: saves away a sample that was not able to be sent to the server
 Params: sample: {obj}
 */
 function saveFailedSample(sample) {
+
+	// try to reconnect
+	wifi.reconnect((err) => {
+		if (err) {
+			console.log("problem with reconnecting: ", err);
+		} else {
+			console.log("successfully reconnected");
+		}
+	});
 
 	jsonfile.readFile(HOLD_FILE, function (err, savedData) {
 		if (!savedData) {
@@ -138,18 +77,17 @@ function saveFailedSample(sample) {
 Function: Report
 Purpose: sends a sample to the server
 */
-var report = function () {
+function report(totalLoudness) {
 	// create the post data with the current sound sample
-	var loudnessValue = getTotalLoudness();
-	var data = createPostData(loudnessValue);
+	var data = {
+		url: SERVER_LOCATION,
+		form: {
+			loudness: totalLoudness,
+			decibels: totalLoudness,
+			atTime: new Date().valueOf()
+		}
+	};
 
-	if (displayState === DISPLAY_STATES.LOUDNESS) {
-		displayLoudness(loudnessValue);
-		displayState = DISPLAY_STATES.CONNECTION
-	} else {
-		displayConnectivityState();
-		displayState = DISPLAY_STATES.LOUDNESS
-	}
 
 	//post the data and handle the aftermath
 	request.post(data, function (err, httpResponse, body) {
@@ -167,11 +105,48 @@ var report = function () {
 }
 
 
-// set a timer to get the loudness of the envirnment every second
-setInterval(checkLoundess, 1 * 1000);
+function changeDisplayState(totalLoudness) {
+	if (displayState === DISPLAY_STATES.LOUDNESS) {
+		display.loudness(totalLoudness);
+		displayState = DISPLAY_STATES.CONNECTION
+	} else {
+		display.connectivityState();
+		displayState = DISPLAY_STATES.LOUDNESS
+	}
+}
 
-//set the sample clock, this block will be executed every n(s)
-setInterval(report, 10 * 1000); // ten seconds
+
+
+
+var seconds = 0;
+// event loop, go every second.
+setInterval(function () {
+	// do the every second stuff
+	// get loudness
+	var loudness = getLoudness();
+	// compound loudness
+	compoundLoudness += loudness;
+
+	// check if it is time to do a 10 second operation
+	if (seconds > 9) {
+		// report compound loudness
+		report(compoundLoudness);
+		// switch display
+		changeDisplayState(compoundLoudness);
+		// reset compound value
+		compoundLoudness = 0;
+		// reset seconds
+		seconds = 0;
+	}
+	seconds += 1;
+}, 1 * 1000);
+
+//
+//// set a timer to get the loudness of the envirnment every second
+//setInterval(checkLoundess, 1 * 1000);
+//
+////set the sample clock, this block will be executed every n(s)
+//setInterval(report, 10 * 1000); // ten seconds
 
 
 // exit on ^c
