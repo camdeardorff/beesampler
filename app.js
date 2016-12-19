@@ -5,7 +5,7 @@ const SERVER_LOCATION = "http://cafbees.herokuapp.com";
 const NEW_SAMPLE_URL = SERVER_LOCATION + "/samples/new";
 const BULK_SAMPLE_URL = SERVER_LOCATION + "/samples/new/bulk";
 
-// module libraries
+// utilities
 var WifiControl = require('./util/wifi-control');
 var wifi = new WifiControl(WIFI_SSID);
 
@@ -14,6 +14,7 @@ var display = new lcdDisplay(0);
 
 var sampleDB = require('./util/sample-saver');
 
+// loudness sensor library
 var groveSensor = require('jsupm_loudness');
 var sensor = new groveSensor.Loudness(0, 5.0);
 
@@ -39,7 +40,13 @@ function getLoudness() {
 }
 
 
-
+/*
+Function: Create Post Object
+Purpose: abstracts the creation of the 'request' http request object
+Params: loudness: number
+		atTime: Date
+Returns: {obj}
+*/
 function createPostObj(loudness, atTime) {
 	return {
 		url: NEW_SAMPLE_URL,
@@ -56,7 +63,6 @@ Function: Report
 Purpose: sends a sample to the server
 */
 function report(sendObj, callback) {
-	console.log("report");
 	//post the data and handle the aftermath
 	request.post(sendObj, function (err, httpResponse, body) {
 		if (err || httpResponse.statusCode !== 200) {
@@ -69,6 +75,11 @@ function report(sendObj, callback) {
 }
 
 
+/*
+Function: Change Display State
+Purpose: switches the display between connectivity status and loudness
+Params: totalLoudness: number
+*/
 function changeDisplayState(totalLoudness) {
 	if (displayState === DISPLAY_STATES.LOUDNESS) {
 		display.loudness(totalLoudness);
@@ -80,8 +91,13 @@ function changeDisplayState(totalLoudness) {
 }
 
 
+/* 
+Function: Report Bulk Samples
+Purpose: sends all samples that have been stored due to lack of network connectivity
+Params: samples: [{obj}]
+		callback: ()
+*/
 function reportBulkSamples(samples, callback) {
-	console.log("report bulk samples");
 	if (samples.length > 0) {
 		var sendObj = {
 			url: BULK_SAMPLE_URL,
@@ -98,6 +114,10 @@ function reportBulkSamples(samples, callback) {
 }
 
 
+/*
+Function: Send Saved Samples
+Purpose: gets all saved samples and sends them
+*/
 function sendSavedSamples() {
 	console.log("ssend saved samples");
 	sampleDB.getAll((err, samples) => {
@@ -110,27 +130,19 @@ function sendSavedSamples() {
 }
 
 
-
 // check for residual saved samples on startup
-console.log("check for residual samples");
 sampleDB.getAll((err, samples) => {
 	if (!err && samples) {
 		if (samples.length > 0) {
-			console.log("there are residual samples... send");
 			sendSavedSamples();
 		}
 	}
 });
 
-
-
-
-
-
+// counter... tells when to send a report
 var seconds = 0;
 // event loop, go every second.
 setInterval(function () {
-	console.log("event loop");
 	// do the every second stuff
 	// get loudness
 	var loudness = getLoudness();
@@ -139,7 +151,6 @@ setInterval(function () {
 
 	// check if it is time to do a 10 second operation
 	if (seconds > 9) {
-		console.log("10 second mark");
 		// report compound loudness
 		var sendObj = createPostObj(compoundLoudness, null);
 		report(sendObj, function (err, sample) {
@@ -148,14 +159,12 @@ setInterval(function () {
 				// save the sample
 				sampleDB.save(sample, function (err) {});
 				// try to connect back to the wifi
-
 				wifi.reconnect((err) => {
 					if (!err) {
-						// send any old samples
+						// send any old samples once reconnected
 						sendSavedSamples();
 					}
 				});
-
 			}
 		});
 		// switch display
