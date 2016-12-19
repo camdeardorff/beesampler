@@ -6,13 +6,13 @@ const NEW_SAMPLE_URL = SERVER_LOCATION + "/samples/new";
 const BULK_SAMPLE_URL = SERVER_LOCATION + "/samples/new/bulk";
 
 // module libraries
-var WifiControl = require('./wifi-control');
+var WifiControl = require('./util/wifi-control');
 var wifi = new WifiControl(WIFI_SSID);
 
-var lcdDisplay = require('./display');
+var lcdDisplay = require('./util/display');
 var display = new lcdDisplay(0);
 
-var sampleDB = require('./sample-save');
+var sampleDB = require('./util/sample-saver');
 
 var groveSensor = require('jsupm_loudness');
 var sensor = new groveSensor.Loudness(0, 5.0);
