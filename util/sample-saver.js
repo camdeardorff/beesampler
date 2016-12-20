@@ -1,14 +1,9 @@
 var jsonfile = require('jsonfile');
-const HOLD_FILE = '/home/root/CafSense/savedSamples.json'
+const HOLD_FILE = '/home/root/CafSense/persistence/saved-samples.json'
 
-
-/*
-Function: Save Failed Sample
-Purpose: saves away a sample that was not able to be sent to the server for whatever reason.
-Params: sample: {obj}
-*/
 module.exports = {
 
+	// takes a sample and pushes it onto the array of saved samples
 	save: function (sample, callback) {
 		console.log("save sample: ", sample);
 		jsonfile.readFile(HOLD_FILE, function (err, savedData) {
@@ -30,7 +25,7 @@ module.exports = {
 		});
 	},
 
-
+	// empties the array of saved samples
 	removeAll: function (callback) {
 		console.log("remove all samples");
 		var savedData = {
@@ -41,7 +36,7 @@ module.exports = {
 		});
 	},
 
-
+	// gets all of the samples from the saved samples array
 	getAll: function (callback) {
 		console.log("get all saved samples");
 		jsonfile.readFile(HOLD_FILE, (err, savedData) => {
@@ -53,5 +48,4 @@ module.exports = {
 			}
 		});
 	}
-
-}
+};
