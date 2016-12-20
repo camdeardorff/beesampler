@@ -1,12 +1,3 @@
-//var os = require('os');
-//console.log("arch: ", os.arch());
-//console.log("cpus: ", os.cpus());
-//console.log("endianess: ", os.endianness());
-//console.log("free memory: ", os.freemem());
-//console.log("total memory: ", os.totalmem());
-//console.log("free mem %", os.freemem() / os.totalmem());
-//console.log("network int: ", os.networkInterfaces().wlp1s0[0]);
-
 var exec = require('child_process').exec;
 var async = require('async');
 
@@ -16,12 +7,17 @@ var WifiControl = function (wifiName) {
 };
 
 
+/*
+Function: Reconnect
+Purpose: reconnects back to the wireless network provided
+*/
 WifiControl.prototype.reconnect = function (callback) {
-	console.log("reconnect::try to reconnect");
+	console.log("reconnect:: starting reconnect");
 
 	var wirelessAddress = null;
 	var connected = false;
 
+	// scans wireless signals
 	var scanWifi = function (callback) {
 		console.log("reconnect::scan wifi");
 		exec("connmanctl scan wifi", function (error, stdout, stderr) {
@@ -34,9 +30,10 @@ WifiControl.prototype.reconnect = function (callback) {
 		});
 	};
 
+	// grab this.ssid as name... context switches inside of this block
 	var name = this.ssid;
+	// gets the symbol name associated with the provided ssid
 	var getWirelessName = function (callback) {
-
 		console.log("reconnect::get wireless name");
 		exec("connmanctl services | grep '" + name + "'", function (error, stdout, stderr) {
 			if (error || stderr) {
@@ -54,6 +51,7 @@ WifiControl.prototype.reconnect = function (callback) {
 		});
 	};
 
+	// checks to see if we are currently connected to this wireless network
 	var checkStatus = function (callback) {
 		console.log("reconnect::check status");
 		exec("connmanctl technologies | grep 'Connected = True'", function (error, stdout, stderr) {
@@ -72,8 +70,7 @@ WifiControl.prototype.reconnect = function (callback) {
 		});
 	};
 
-
-
+	// connects to the wireless network
 	var connectToWireless = function (callback) {
 		console.log("reconnect::connect to wireless");
 		if (!wirelessAddress) {
@@ -93,7 +90,7 @@ WifiControl.prototype.reconnect = function (callback) {
 		}
 	};
 
-
+	// complete each of these tasks sequentially
 	async.series([scanWifi, getWirelessName, connectToWireless], function (err) {
 		callback(err);
 	});
