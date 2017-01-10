@@ -1,6 +1,6 @@
 {
   "name": "caf-sense",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "description": "A small nodejs program to run on Intel Galileo 2. This program is intended to sense sound and measure in decibels, it is to send that information to another serivce to be handled.",
   "main": "app.js",
   "scripts": {

@@ -1,6 +1,6 @@
 console.log("Running...");
 
-const WIFI_SSID = "Deardorff";
+const WIFI_SSID = "MVNU-student";
 const SERVER_LOCATION = "http://cafbees.herokuapp.com";
 const NEW_SAMPLE_URL = SERVER_LOCATION + "/samples/new";
 const BULK_SAMPLE_URL = SERVER_LOCATION + "/samples/new/bulk";
