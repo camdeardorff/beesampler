@@ -1,4 +1,4 @@
-console.log("Running...");
+console.log("Starting...");
 
 const WIFI_SSID = "MVNU-student";
 const SERVER_LOCATION = "http://cafbees.herokuapp.com";
@@ -14,9 +14,14 @@ var display = new lcdDisplay(0);
 
 var sampleDB = require('./util/sample-saver');
 
+// 
+const kREF_SPL = 94
+const kSENSITIVITY = 3.16
+const kREFERENCE = 5.0
 // loudness sensor library
 var groveSensor = require('jsupm_loudness');
-var sensor = new groveSensor.Loudness(0, 5.0);
+var sensor = new groveSensor.Loudness(0, kREFERENCE);
+
 
 // libraries
 var request = require('request');
@@ -39,6 +44,23 @@ function getLoudness() {
 	return sensor.loudness() * 100;
 }
 
+function getDecibels() {
+	var decibels = (kREF_SPL + 20 * Math.log10(sensor.loudness() / kSENSITIVITY));
+	if (decibels === Number.NEGATIVE_INFINITY) {
+		// if the number is negative infinity then just try again
+		return getDecibels();
+	} else {
+		return decibels;
+	}
+}
+
+function averageNumbers(set) {
+	var total = 0;
+	for (var i=0; i<set.length; i++) {
+		total += set[i];
+	}
+	return total / set.length;
+}
 
 /*
 Function: Create Post Object
@@ -119,7 +141,7 @@ Function: Send Saved Samples
 Purpose: gets all saved samples and sends them
 */
 function sendSavedSamples() {
-	console.log("ssend saved samples");
+	console.log("send saved samples");
 	sampleDB.getAll((err, samples) => {
 		reportBulkSamples(samples, (err) => {
 			if (!err) {
@@ -141,18 +163,21 @@ sampleDB.getAll((err, samples) => {
 
 // counter... tells when to send a report
 var seconds = 0;
+var decibelSet = [];
 // event loop, go every second.
 setInterval(function () {
 	// do the every second stuff
-	// get loudness
-	var loudness = getLoudness();
-	// compound loudness
-	compoundLoudness += loudness;
+	// get decibels and add it to the set
+	decibelSet.push(getDecibels());
 
 	// check if it is time to do a 10 second operation
 	if (seconds > 9) {
-		// report compound loudness
-		var sendObj = createPostObj(compoundLoudness, null);
+
+		// average the decibels in the set
+		var avgDecibels = averageNumbers(decibelSet);
+		// create the post obj
+		var sendObj = createPostObj(avgDecibels, null);
+		// send it to the server
 		report(sendObj, function (err, sample) {
 			// if there was an error sending the sample
 			if (err || sample) {
@@ -168,9 +193,9 @@ setInterval(function () {
 			}
 		});
 		// switch display
-		changeDisplayState(compoundLoudness);
-		// reset compound value
-		compoundLoudness = 0;
+		changeDisplayState(avgDecibels);
+		// reset the set (empty)
+		decibelSet = [];
 		// reset seconds
 		seconds = 0;
 	}
